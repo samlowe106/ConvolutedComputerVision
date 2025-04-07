@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "convolutedcomputervision"
+version = "0.1.0"
+description = ""
+authors = ["Samuel Lowe <samlowe106@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+matplotlib = "^3.10.1"
+notebook = "^7.3.3"
+pandas = "^2.2.3"
+scikit-learn = "^1.6.1"
+seaborn = "^0.13.2"
+tensorflow = "^2.19.0"
+torch = "^2.6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
