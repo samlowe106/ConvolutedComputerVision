@@ -1,3 +1,6 @@
+# data folders
+data/
+
 # keras model files
 best_model.keras
 
