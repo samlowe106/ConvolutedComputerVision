@@ -14,6 +14,7 @@ scikit-learn = "^1.6.1"
 seaborn = "^0.13.2"
 tensorflow = "^2.19.0"
 torch = "^2.6.0"
+tensorflow-datasets = "^4.9.8"
 
 
 [build-system]
