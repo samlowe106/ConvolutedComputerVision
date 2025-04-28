@@ -2,7 +2,7 @@
 data/
 
 # keras model files
-best_model.keras
+*.keras
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
