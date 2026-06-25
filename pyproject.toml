@@ -1,22 +1,29 @@
-[tool.poetry]
+[build-system]
+requires = ["uv_build>=0.11.23,<0.12.0"]
+build-backend = "uv_build"
+
+[project]
 name = "convolutedcomputervision"
 version = "0.1.0"
 description = ""
-authors = ["Samuel Lowe <samlowe106@gmail.com>"]
+authors = [{ name = "Samuel Lowe", email = "samlowe106@gmail.com" }]
+requires-python = ">=3.10,<4"
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.10"
-matplotlib = "^3.10.1"
-notebook = "^7.3.3"
-pandas = "^2.2.3"
-scikit-learn = "^1.6.1"
-seaborn = "^0.13.2"
-tensorflow = "^2.19.0"
-torch = "^2.6.0"
-tensorflow-datasets = "^4.9.8"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "matplotlib>=3.10.1,<4",
+    "notebook>=7.3.3,<8",
+    "pandas>=2.2.3,<3",
+    "scikit-learn>=1.6.1,<2",
+    "seaborn>=0.13.2,<0.14",
+    "tensorflow>=2.19.0,<3",
+    "torch>=2.6.0,<3",
+    "tensorflow-datasets>=4.9.8,<5",
+]
