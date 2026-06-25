@@ -37,11 +37,32 @@ def plot_binary_confusion_matrix(
             f"{pos} ({(cm[1][0] + cm[1][1]) / n:.3f})",
         ]
     )
-    ax.set_title("Confusion Matrix")
+
+
+def show_confusion_matrix(
+    y_true,
+    y_pred,
+    class_names=("Normal", "Pneumonia"),
+    ax=None,
+    title="Confusion Matrix",
+):
+    """Draw a confusion matrix, creating a standalone figure when ``ax`` is None.
+
+    Shared by ``summary_graphics`` (which passes its own subplot ``ax``) and the
+    threshold-tuning cells (which want a standalone figure).
+    """
+    standalone = ax is None
+    if standalone:
+        _, ax = plt.subplots(figsize=(5, 5))
+    plot_binary_confusion_matrix(ax, y_true, y_pred, class_names)
+    ax.set_title(title)
+    if standalone:
+        plt.show()
 
 
 def summary_graphics(history, model, test_ds, class_names=("Normal", "Pneumonia")):
-    """Plot TP/TN curves, train/val loss, and the test-set confusion matrix.
+    """Plot validation recall/precision (+ AUC if tracked), train/val loss, and
+    the test-set confusion matrix.
 
     ``model`` is evaluated on ``test_ds``; the true labels are read from it, so
     no separate ``y_true`` is needed.
@@ -53,14 +74,17 @@ def summary_graphics(history, model, test_ds, class_names=("Normal", "Pneumonia"
     fig.set_size_inches(16, 5)
     ax = ax.flatten()
 
-    # true positive / true negative counts (more telling than accuracy on imbalanced data)
-    ax[0].plot(history.history["tp"], label="True Positives", color="g")
-    ax[0].plot(history.history["tn"], label="True Negatives", color="r")
+    # validation metrics that matter on imbalanced data (recall = 1 - false-neg rate)
+    ax[0].plot(history.history["val_recall"], label="Recall", color="g")
+    ax[0].plot(history.history["val_precision"], label="Precision", color="b")
+    if "val_auc" in history.history:
+        ax[0].plot(history.history["val_auc"], label="AUC", color="purple")
     ax[0].grid(True)
     ax[0].set_xlabel("Epoch")
-    ax[0].set_ylabel("Metric Value")
-    ax[0].legend(loc="right")
-    ax[0].set_title("True Positive and True Negative Rates")
+    ax[0].set_ylabel("Validation score")
+    ax[0].set_ylim(0, 1)
+    ax[0].legend(loc="lower right")
+    ax[0].set_title("Validation Metrics")
 
     # loss
     ax[1].plot(history.history["loss"], label="Loss")
@@ -71,7 +95,7 @@ def summary_graphics(history, model, test_ds, class_names=("Normal", "Pneumonia"
     ax[1].legend(loc="upper right")
     ax[1].set_title("Loss")
 
-    plot_binary_confusion_matrix(ax[2], y_true, y_pred, class_names)
+    show_confusion_matrix(y_true, y_pred, ax=ax[2], class_names=class_names)
     plt.show()
 
 
