@@ -1,18 +1,133 @@
-"""Reusable training/evaluation plots shared across the notebooks in this repo.
+"""Reusable training/evaluation helpers shared across the notebooks in this repo.
 
-The notebooks live one directory below the repo root, so import with:
+Installed as an editable package (via ``uv sync``), so notebooks just::
 
-    import sys
-
-    sys.path.insert(0, "..")  # repo root, so `visualization` is importable
-    from visualization import summary_graphics, plot_confusion_matrix
+    from visualization import summary_graphics, show_confusion_matrix, reset_keras
+    from visualization import colab_bootstrap
 """
+
+import gc
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
 from sklearn.metrics import confusion_matrix
+
+
+def _report_gpu(in_colab):
+    """Print whether a GPU is visible -- a forgotten GPU runtime trains on CPU."""
+    n_gpu = len(tf.config.list_physical_devices("GPU"))
+    if n_gpu:
+        print(f"[colab_bootstrap] {n_gpu} GPU(s) visible")
+    elif in_colab:
+        print(
+            "[colab_bootstrap] WARNING: no GPU visible -- training will be very slow. "
+            "Set Runtime > Change runtime type > GPU, then Runtime > Restart."
+        )
+    else:
+        print("[colab_bootstrap] no GPU (local CPU run)")
+
+
+def _ensure_dataset(data_root, dataset_script):
+    """Run the repo-relative ``dataset_script`` to fetch data if ``data_root`` is empty."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    if not dataset_script or os.path.isdir(os.path.join(data_root, "train")):
+        return
+    repo_root = Path(__file__).resolve().parents[2]  # src/visualization/__init__.py
+    script = repo_root / dataset_script
+    print(f"[colab_bootstrap] data missing -> running {dataset_script}")
+    subprocess.run([sys.executable, str(script), "--data-dir", data_root], check=True)
+
+
+def colab_bootstrap(
+    data_subdir,
+    *,
+    drive_data_root="/content/drive/MyDrive/datasets",
+    drive_ckpt_root="/content/drive/MyDrive/cv-checkpoints",
+    local_data_dir="data",
+    local_ckpt_dir=".",
+    pip_packages=("seaborn", "tensorflow-datasets"),
+    mount_drive=True,
+    dataset_script=None,
+):
+    """Resolve where data and model checkpoints live, doing Colab setup if needed.
+
+    Returns ``(data_root, ckpt_root)`` so a notebook can run unchanged locally or on
+    Google Colab. Locally it just returns ``(local_data_dir, local_ckpt_dir)`` with no
+    side effects beyond creating the checkpoint dir. On Colab it:
+
+    1. ``pip install``\\ s only the extras Colab lacks (``pip_packages``) -- deliberately
+       NOT tensorflow, so Colab's preinstalled *GPU* build is left intact (the project's
+       pinned ``tensorflow-cpu`` would otherwise downgrade it).
+    2. mounts Google Drive (so data + checkpoints persist across sessions), and
+    3. points ``data_root``/``ckpt_root`` at Drive.
+
+    In both environments it reports GPU visibility and, if ``dataset_script`` is given
+    (a repo-relative path) and ``data_root`` has no ``train/`` subdir, runs that script
+    (``python <repo>/<dataset_script> --data-dir <data_root>``) to fetch the data.
+
+    Imports specific to each environment (``subprocess``, ``google.colab``) are done
+    lazily inside so importing this module never requires them.
+    """
+    import os
+    import sys
+
+    in_colab = "google.colab" in sys.modules
+    if not in_colab:
+        os.makedirs(local_ckpt_dir, exist_ok=True)
+        print(
+            f"[colab_bootstrap] local run -> data={local_data_dir!r}, "
+            f"ckpt={local_ckpt_dir!r}"
+        )
+        _ensure_dataset(local_data_dir, dataset_script)
+        _report_gpu(in_colab)
+        return local_data_dir, local_ckpt_dir
+
+    # 1. install only the missing extras -- NOT tensorflow (keep Colab's GPU build)
+    if pip_packages:
+        import subprocess
+
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", *pip_packages], check=True
+        )
+
+    # 2. mount Drive so data + checkpoints survive session disconnects
+    if mount_drive:
+        from google.colab import drive
+
+        drive.mount("/content/drive")
+
+    data_root = os.path.join(drive_data_root, data_subdir)
+    ckpt_root = drive_ckpt_root
+    os.makedirs(ckpt_root, exist_ok=True)
+    os.makedirs(data_root, exist_ok=True)
+
+    _ensure_dataset(data_root, dataset_script)
+    if not os.path.isdir(os.path.join(data_root, "train")):
+        print(
+            f"[colab_bootstrap] WARNING: {data_root!r} has no train/ data. Upload the "
+            "dataset there (train/ val/ test/), or pass dataset_script= to fetch it."
+        )
+    print(f"[colab_bootstrap] Colab run -> data={data_root!r}, ckpt={ckpt_root!r}")
+    _report_gpu(in_colab)
+    return data_root, ckpt_root
+
+
+def reset_keras():
+    """Free memory between model runs -- call before building each model.
+
+    Notebooks that train several models in one kernel session accumulate TF graph
+    state and matplotlib figures, which can eventually crash the kernel. This
+    closes open figures, clears the Keras backend, and runs a gc pass.
+    """
+    plt.close("all")
+    tf.keras.backend.clear_session()
+    gc.collect()
 
 
 def plot_binary_confusion_matrix(
@@ -97,6 +212,7 @@ def summary_graphics(history, model, test_ds, class_names=("Normal", "Pneumonia"
 
     show_confusion_matrix(y_true, y_pred, ax=ax[2], class_names=class_names)
     plt.show()
+    plt.close(fig)  # free the figure so they don't pile up across many models
 
 
 def plot_confusion_matrix(
