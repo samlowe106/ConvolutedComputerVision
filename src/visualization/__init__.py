@@ -3,7 +3,7 @@
 Installed as an editable package (via ``uv sync``), so notebooks just::
 
     from visualization import summary_graphics, show_confusion_matrix, reset_keras
-    from visualization import colab_bootstrap
+    from visualization import colab_bootstrap, gradcam_heatmaps, show_gradcam
 """
 
 import gc
@@ -13,6 +13,9 @@ import numpy as np
 import seaborn as sns
 import tensorflow as tf
 from sklearn.metrics import confusion_matrix
+
+from .gradcam import gradcam_heatmaps as gradcam_heatmaps
+from .gradcam import show_gradcam as show_gradcam
 
 
 def _report_gpu(in_colab):
@@ -29,37 +32,42 @@ def _report_gpu(in_colab):
         print("[colab_bootstrap] no GPU (local CPU run)")
 
 
-def _ensure_dataset(data_root, dataset_script):
-    """Run the repo-relative ``dataset_script`` to fetch data if ``data_root`` is empty."""
-    import os
-    import subprocess
+def _load_study_fetcher(study):
+    """Import a study directory's self-contained ``download_data.py`` module."""
+    import importlib.util
     import sys
     from pathlib import Path
 
-    if not dataset_script or os.path.isdir(os.path.join(data_root, "train")):
-        return
-    repo_root = Path(__file__).resolve().parents[2]  # src/visualization/__init__.py
-    script = repo_root / dataset_script
-    print(f"[colab_bootstrap] data missing -> running {dataset_script}")
-    subprocess.run([sys.executable, str(script), "--data-dir", data_root], check=True)
+    study_dir = Path(__file__).resolve().parents[2] / study
+    # put the study dir on the path so the script's own imports (e.g. split_data) resolve
+    if str(study_dir) not in sys.path:
+        sys.path.insert(0, str(study_dir))
+    name = "_download_data_" + study.replace("/", "_").replace("-", "_")
+    spec = importlib.util.spec_from_file_location(name, study_dir / "download_data.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def colab_bootstrap(
-    data_subdir,
+    study=None,
     *,
     drive_data_root="/content/drive/MyDrive/datasets",
     drive_ckpt_root="/content/drive/MyDrive/cv-checkpoints",
     local_data_dir="data",
     local_ckpt_dir=".",
-    pip_packages=("seaborn", "tensorflow-datasets"),
+    pip_packages=("pooch", "seaborn"),
     mount_drive=True,
-    dataset_script=None,
 ):
     """Resolve where data and model checkpoints live, doing Colab setup if needed.
 
     Returns ``(data_root, ckpt_root)`` so a notebook can run unchanged locally or on
-    Google Colab. Locally it just returns ``(local_data_dir, local_ckpt_dir)`` with no
-    side effects beyond creating the checkpoint dir. On Colab it:
+    Google Colab. ``study`` is a study directory name (e.g. ``"mnist"``); when given, that
+    directory's self-contained ``download_data.py`` is imported and its ``fetch(data_root)``
+    is called (idempotent), and ``data_root`` points at the fetched data. On Colab the Drive
+    subfolder comes from the script's ``SUBDIR`` constant.
+
+    On Colab it also:
 
     1. ``pip install``\\ s only the extras Colab lacks (``pip_packages``) -- deliberately
        NOT tensorflow, so Colab's preinstalled *GPU* build is left intact (the project's
@@ -67,24 +75,23 @@ def colab_bootstrap(
     2. mounts Google Drive (so data + checkpoints persist across sessions), and
     3. points ``data_root``/``ckpt_root`` at Drive.
 
-    In both environments it reports GPU visibility and, if ``dataset_script`` is given
-    (a repo-relative path) and ``data_root`` has no ``train/`` subdir, runs that script
-    (``python <repo>/<dataset_script> --data-dir <data_root>``) to fetch the data.
-
-    Imports specific to each environment (``subprocess``, ``google.colab``) are done
-    lazily inside so importing this module never requires them.
+    In both environments it reports GPU visibility. Environment-specific imports
+    (``subprocess``, ``google.colab``) are done lazily so importing this module is cheap.
     """
     import os
     import sys
 
+    fetcher = _load_study_fetcher(study) if study else None
     in_colab = "google.colab" in sys.modules
+
     if not in_colab:
         os.makedirs(local_ckpt_dir, exist_ok=True)
         print(
             f"[colab_bootstrap] local run -> data={local_data_dir!r}, "
             f"ckpt={local_ckpt_dir!r}"
         )
-        _ensure_dataset(local_data_dir, dataset_script)
+        if fetcher:
+            fetcher.fetch(local_data_dir)
         _report_gpu(in_colab)
         return local_data_dir, local_ckpt_dir
 
@@ -102,17 +109,14 @@ def colab_bootstrap(
 
         drive.mount("/content/drive")
 
-    data_root = os.path.join(drive_data_root, data_subdir)
+    subdir = getattr(fetcher, "SUBDIR", study) if fetcher else "data"
+    data_root = os.path.join(drive_data_root, subdir)
     ckpt_root = drive_ckpt_root
     os.makedirs(ckpt_root, exist_ok=True)
     os.makedirs(data_root, exist_ok=True)
 
-    _ensure_dataset(data_root, dataset_script)
-    if not os.path.isdir(os.path.join(data_root, "train")):
-        print(
-            f"[colab_bootstrap] WARNING: {data_root!r} has no train/ data. Upload the "
-            "dataset there (train/ val/ test/), or pass dataset_script= to fetch it."
-        )
+    if fetcher:
+        fetcher.fetch(data_root)  # idempotent: skips if already on Drive
     print(f"[colab_bootstrap] Colab run -> data={data_root!r}, ckpt={ckpt_root!r}")
     _report_gpu(in_colab)
     return data_root, ckpt_root

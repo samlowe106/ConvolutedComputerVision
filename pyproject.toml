@@ -27,6 +27,8 @@ dependencies = [
     "torch>=2.6.0,<3",
     "tensorflow-datasets>=4.9.8,<5",
     "importlib-resources>=7.1.0",
+    "pooch>=1.8,<2",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [tool.uv.build-backend]
