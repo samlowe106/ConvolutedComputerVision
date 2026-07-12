@@ -15,8 +15,16 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def _known_hash(sha256):
+    # None leaves the download unverified; pooch prints the computed hash so you can pin it
+    return ("sha256:" + sha256) if sha256 else None
+
+
 def fetch_file(url, sha256, data_dir, fname):
-    """Download a single file to ``data_dir/fname`` (hash-verified, cached). Returns Path."""
+    """Download a single file to ``data_dir/fname`` (hash-verified, cached). Returns Path.
+
+    Pass ``sha256=None`` to skip verification (pooch logs the hash so you can pin it later).
+    """
     import pooch
 
     data_dir = Path(data_dir)
@@ -24,7 +32,7 @@ def fetch_file(url, sha256, data_dir, fname):
     return Path(
         pooch.retrieve(
             url=url,
-            known_hash="sha256:" + sha256,
+            known_hash=_known_hash(sha256),
             fname=fname,
             path=data_dir,
             progressbar=True,
@@ -36,6 +44,7 @@ def fetch_archive(url, sha256, data_dir, fname, kind="zip"):
     """Download + extract an archive under ``data_dir/.cache``; return extracted paths.
 
     ``kind`` is ``"zip"`` or ``"tar"``. The archive is cached, so re-runs skip the download.
+    Pass ``sha256=None`` to skip verification (pooch logs the hash so you can pin it later).
     """
     import pooch
 
@@ -48,7 +57,7 @@ def fetch_archive(url, sha256, data_dir, fname, kind="zip"):
     )
     return pooch.retrieve(
         url=url,
-        known_hash="sha256:" + sha256,
+        known_hash=_known_hash(sha256),
         fname=fname,
         path=data_dir / ".cache",
         processor=processor,
