@@ -21,6 +21,10 @@ repos:
       - id: name-tests-test
         args: [--pytest-test-first]  # expect test_*.py (pytest convention)
       - id: pretty-format-json
+        # .ipynb is JSON, but it is owned by the notebook tooling (nbformat / nbqa /
+        # ruff), which writes 1-space indent. pretty-format-json writes 2-space indent, so
+        # the two fight and the hook never converges. Skip notebooks; it still covers .json.
+        exclude_types: [jupyter]
         args: [--autofix, --no-sort-keys]
       - id: sort-simple-yaml
       - id: trailing-whitespace
