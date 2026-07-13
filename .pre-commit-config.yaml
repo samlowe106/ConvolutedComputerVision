@@ -30,7 +30,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.19
+    rev: v0.15.21
     hooks:
       - id: ruff
         args: [--fix]
@@ -40,10 +40,12 @@ repos:
     rev: 26.5.1
     hooks:
       - id: black
+        # black takes its target Python from requires-python in pyproject.toml (3.13), so
+        # no --target-version is needed and it will not target a future Python it can't parse
         args: [--safe]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v2.1.0"
+    rev: "v2.2.0"
     hooks:
       - id: mypy
         # Each study has its own standalone download_data.py; they share a module name
