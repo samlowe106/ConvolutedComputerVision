@@ -57,3 +57,27 @@ def class_weights(source=None, *, cache_dir=None, normalize=True):
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps({str(k): v for k, v in weights.items()}, indent=2))
     return weights
+
+
+def label_pos_weights(labels, cache_dir=None):
+    """Per-label positive weights for MULTI-LABEL training: ``n_neg / n_pos`` per column.
+
+    Keras ``class_weight`` is single-label only, so for a multi-label target (an ``(N, L)``
+    array of 0/1 flags) the analog is a length-``L`` weight applied to the positive term of
+    a weighted binary cross-entropy, up-weighting each label's rarer positive. Cached like
+    :func:`class_weights` (the label matrix is small and in memory, so this is cheap; the
+    cache just avoids repeating it across runs).
+    """
+    cache = (
+        Path(cache_dir) / "label_pos_weights.json" if cache_dir is not None else None
+    )
+    if cache is not None and cache.exists():
+        return np.asarray(json.loads(cache.read_text()), dtype="float32")
+
+    labels = np.asarray(labels)
+    pos = labels.sum(axis=0)
+    weights = ((labels.shape[0] - pos) / np.maximum(pos, 1)).astype("float32")
+    if cache is not None:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(weights.tolist()))
+    return weights
