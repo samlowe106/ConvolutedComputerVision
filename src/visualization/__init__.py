@@ -69,9 +69,9 @@ def colab_bootstrap(
 
     On Colab it also:
 
-    1. ``pip install``\\ s only the extras Colab lacks (``pip_packages``) -- deliberately
-       NOT tensorflow, so Colab's preinstalled *GPU* build is left intact (the project's
-       pinned ``tensorflow-cpu`` would otherwise downgrade it).
+    1. ``pip install``\\ s only the extras Colab lacks (``pip_packages``), not tensorflow,
+       so Colab's preinstalled GPU build is left intact (reinstalling tensorflow from the
+       project's dependencies would disturb that build).
     2. mounts Google Drive (so data + checkpoints persist across sessions), and
     3. points ``data_root``/``ckpt_root`` at Drive.
 
