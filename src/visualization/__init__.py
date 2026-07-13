@@ -18,6 +18,7 @@ from .plots import (
     show_confusion_matrix,
     summary_graphics,
 )
+from .weights import class_weights
 
 __all__ = [
     "colab_bootstrap",
@@ -28,4 +29,5 @@ __all__ = [
     "plot_binary_confusion_matrix",
     "summary_graphics",
     "plot_confusion_matrix",
+    "class_weights",
 ]
